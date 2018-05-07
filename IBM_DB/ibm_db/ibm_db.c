@@ -742,7 +742,7 @@ static void _python_ibm_db_check_sql_errors( SQLHANDLE handle, SQLSMALLINT hType
 static int _python_ibm_db_assign_options( void *handle, int type, long opt_key, PyObject *data )
 {
 	int rc = 0;
-	long option_num = 0;
+	SQLINTEGER option_num = 0;
 	SQLTCHAR *option_str = NULL;
 	int isNewBuffer;
 

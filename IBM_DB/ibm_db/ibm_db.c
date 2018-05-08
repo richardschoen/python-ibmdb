@@ -8168,24 +8168,33 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
 			rc = _python_ibm_db_get_data(stmt_res, col_num + 1, targetCType, out_ptr, 
 					INIT_BUFSIZ + len_terChar, &out_length);
 			if ( rc == SQL_SUCCESS_WITH_INFO ) {
+                size_t bytes = INIT_BUFSIZ;
 				void *tmp_out_ptr = NULL;
 
-				tmp_out_ptr = ALLOC_N(char, out_length + INIT_BUFSIZ + len_terChar);
-				memcpy(tmp_out_ptr, out_ptr, INIT_BUFSIZ);
+				tmp_out_ptr = ALLOC_N(char, out_length + len_terChar);
+#ifdef PASE
+                // PASE CLI has a bug that causes it not to NULL-terminate
+                // the output when SQLGetData truncates. Only do this for character types
+                // (those that have a len_terChar > 0)
+                if (len_terChar && ((char*)out_ptr)[bytes] != 0) {
+                    bytes++;
+                }
+#endif
+				memcpy(tmp_out_ptr, out_ptr, bytes);
 				PyMem_Del(out_ptr);
 				out_ptr = tmp_out_ptr;
 
-				rc = _python_ibm_db_get_data(stmt_res, col_num + 1, targetCType, (char *)out_ptr + INIT_BUFSIZ,
-					out_length + len_terChar, &out_length);
+				rc = _python_ibm_db_get_data(stmt_res, col_num + 1, targetCType, (char *)out_ptr + bytes,
+					out_length - bytes + len_terChar, &out_length);
 				if (rc == SQL_ERROR) {
 					PyMem_Del(out_ptr);
 					out_ptr = NULL;
 					return NULL;
 				}
 				if (len_terChar == sizeof(SQLTCHAR)) {
-					retVal = getSQLTCharAsPyUnicodeObject(out_ptr, INIT_BUFSIZ + out_length);
+					retVal = getSQLTCharAsPyUnicodeObject(out_ptr, bytes + out_length);
 				} else {
-					retVal = PyBytes_FromStringAndSize((char *)out_ptr, INIT_BUFSIZ + out_length);
+					retVal = PyBytes_FromStringAndSize((char *)out_ptr, bytes + out_length);
 				}
 			} else if ( rc == SQL_ERROR ) {
 				PyMem_Del(out_ptr);
@@ -8493,15 +8502,24 @@ static PyObject *_python_ibm_db_bind_fetch_helper(PyObject *args, int op)
 					rc = _python_ibm_db_get_data(stmt_res, column_number + 1, targetCType, out_ptr,
 						INIT_BUFSIZ + len_terChar, &out_length);
 					if (rc == SQL_SUCCESS_WITH_INFO) {
+                        size_t bytes = INIT_BUFSIZ;
 						void *tmp_out_ptr = NULL;
 
 						tmp_out_ptr = (void *)ALLOC_N(char, out_length + INIT_BUFSIZ + len_terChar);
-						memcpy(tmp_out_ptr, out_ptr, INIT_BUFSIZ);
+#ifdef PASE
+                        // PASE CLI has a bug that causes it not to NULL-terminate
+                        // the output when SQLGetData truncates. Only do this for character types
+                        // (those that have a len_terChar > 0)
+                        if (len_terChar && ((char*)out_ptr)[bytes] != 0) {
+                            bytes++;
+                        }
+#endif
+						memcpy(tmp_out_ptr, out_ptr, bytes);
 						PyMem_Del(out_ptr);
 						out_ptr = tmp_out_ptr;
 
-						rc = _python_ibm_db_get_data(stmt_res, column_number + 1, targetCType, (char *)out_ptr + INIT_BUFSIZ,
-							out_length + len_terChar, &out_length);
+						rc = _python_ibm_db_get_data(stmt_res, column_number + 1, targetCType, (char *)out_ptr + bytes,
+							out_length - bytes + len_terChar, &out_length);
 						if (rc == SQL_ERROR) {
 							if (out_ptr != NULL) {
 								PyMem_Del(out_ptr);
@@ -8514,9 +8532,9 @@ static PyObject *_python_ibm_db_bind_fetch_helper(PyObject *args, int op)
 						}
 						
 						if (len_terChar == sizeof(SQLTCHAR)) {
-							value = getSQLTCharAsPyUnicodeObject(out_ptr, INIT_BUFSIZ + out_length);
+							value = getSQLTCharAsPyUnicodeObject(out_ptr, bytes + out_length);
 						} else {
-							value = PyBytes_FromStringAndSize((char*)out_ptr, INIT_BUFSIZ + out_length);
+							value = PyBytes_FromStringAndSize((char*)out_ptr, bytes + out_length);
 						}
 					} else if ( rc == SQL_ERROR ) {
 						PyMem_Del(out_ptr);

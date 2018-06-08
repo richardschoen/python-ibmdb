@@ -13,6 +13,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sqlcli1.h>
+#ifndef PASE
+#include <sqlext.h>
+#endif
 #include <Python.h> 
 #include <structmember.h>
 

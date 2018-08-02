@@ -1131,7 +1131,7 @@ class Cursor(object):
         return row
         
     def next( self ):
-        self.__next__()
+        return self.__next__()
         
     # This attribute specifies the number of rows the last executeXXX()
     # produced or affected.  It is a read only attribute. 

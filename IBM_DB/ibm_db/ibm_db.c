@@ -1056,7 +1056,26 @@ static int _python_ibm_db_bind_column_helper(stmt_handle *stmt_res)
 			case SQL_GRAPHIC:
 			case SQL_VARGRAPHIC:
 			case SQL_LONGVARGRAPHIC:
+#ifndef __PASE__
+				// Assume that no matter the source encoding, a
+				// character encoded in fewer than 4 bytes will map to
+				// a Unicode code point below U+10000 and thus maps to
+				// 2-bytes in UTF-16. A source character encoded in
+				// 4 bytes may map to a Unicode code point above U+FFFF,
+				// leading to a UTF-16 surrogate pair, but this would
+				// not mean any expansion.
 				in_length = stmt_res->column_info[i].size+1;
+#else
+				// Assume the worst-case of 1 byte in the source
+				// encoding maps to 4-bytes encoded in UTF-8.
+				//
+				// NOTE: We could do some heuristics to limit the amount
+				// of memory we allocate, but the maximum record length
+				// is 32KiB, so the max we could allocate for all
+				// columns would not exceed 128KiB, which is tiny and
+				// not worth bothering with.
+				in_length = stmt_res->column_info[i].size*4 + 1;
+#endif
 				row_data->w_val = (SQLTCHAR *) ALLOC_N(SQLTCHAR, in_length);
 				rc = SQLBindCol((SQLHSTMT)stmt_res->hstmt, (SQLUSMALLINT)(i+1),
 					SQL_C_TCHAR, row_data->w_val, in_length * sizeof(SQLTCHAR),
@@ -8357,7 +8376,7 @@ static PyObject *_python_ibm_db_bind_fetch_helper(PyObject *args, int op)
 				case SQL_VARGRAPHIC:
 				case SQL_LONGVARGRAPHIC:
 					tmp_length = stmt_res->column_info[column_number].size;
-					value = getSQLTCharAsPyUnicodeObject(row_data->w_val, out_length);
+					value = getSQLTCharAsPyUnicodeObject(row_data->w_val, SQL_NTS);
 					break;
 
 				case SQL_LONGVARCHAR:

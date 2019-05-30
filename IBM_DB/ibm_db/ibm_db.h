@@ -150,7 +150,7 @@
 #define SQL_IS_INTEGER 0
 #define SQL_BEST_ROWID 0
 #define SQLLEN SQLINTEGER
-#define SQLFLOAT double
+#define SQLFLOAT SQLDOUBLE
 #endif
 
 /* fetch */

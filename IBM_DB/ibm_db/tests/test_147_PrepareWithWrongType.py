@@ -13,7 +13,7 @@ class IbmDbTestCase(unittest.TestCase):
 
   def test_147_PrepareWithWrongType(self):
     obj = IbmDbTestFunctions()
-    obj.assert_expect(self.run_test_147)
+    obj.assert_expectf(self.run_test_147)
 
   def run_test_147(self):
     conn = ibm_db.connect(config.database, config.user, config.password)
@@ -48,6 +48,6 @@ class IbmDbTestCase(unittest.TestCase):
 #__SYSTEMI_EXPECTED__
 #Statement Execute Failed: [IBM][CLI Driver] CLI0112E  Error in assignment. SQLSTATE=22005 SQLCODE=-99999
 #__PASE_EXPECTED__
-#Statement Execute Failed: Character in CAST argument not valid. SQLSTATE=22018 SQLCODE=-420
+#Statement Execute Failed: %s argument not valid. SQLSTATE=22018 SQLCODE=-420
 #__IDS_EXPECTED__
 #Statement Execute Failed: [IBM][CLI Driver] CLI0112E  Error in assignment. SQLSTATE=22005 SQLCODE=-99999

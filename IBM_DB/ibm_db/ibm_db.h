@@ -149,7 +149,7 @@
 #ifdef PASE
 #define SQL_IS_INTEGER 0
 #define SQL_BEST_ROWID 0
-#define SQLLEN long
+#define SQLLEN SQLINTEGER
 #define SQLFLOAT double
 #endif
 

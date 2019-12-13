@@ -8,6 +8,11 @@
 |                                                                      | 
 +----------------------------------------------------------------------+
 */
+// To keep diffs cleaner, instead of changing all PASE -> __PASE__
+// for now we just map it here
+#ifdef __PASE__
+#define PASE
+#endif
 
 #include <stdio.h>
 #include <string.h>

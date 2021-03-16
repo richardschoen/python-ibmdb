@@ -511,6 +511,39 @@ SQLRETURN SQLBindCol_replace(SQLHSTMT hstmt, SQLUSMALLINT colno,
 }
 
 #define SQLBindCol SQLBindCol_replace
+SQLRETURN SQLGetData_replace( SQLHSTMT hstmt,
+      SQLUSMALLINT colno,
+      SQLSMALLINT type,
+      SQLPOINTER buffer,
+      SQLINTEGER buflen,
+      SQLINTEGER *ind)
+{
+	// PASE CLI will not null-terminate when it truncates
+	// We save an extra byte, in case that happens so we can
+	// ensure the output is null-terminated
+	SQLINTEGER buflen_orig = buflen;
+	buflen = buflen == 0 ? 0 : buflen - 1;
+
+	SQLRETURN rc = SQLGetData(hstmt, colno, type, buffer, buflen, ind);
+
+	if (buflen_orig != 0 && type == SQL_C_CHAR)
+	{
+		// Ensure that we're always null-terminated
+		char* c = (char*)buffer;
+		c[buflen] = 0;
+	}
+
+	if (*ind == SQL_NTS)
+	{
+		// PASE CLI likes to return SQL_NTS even though it's an input-only parameter
+		// Convert to the real value
+		*ind = strlen((const char*) buffer);
+	}
+
+	return rc;
+}
+
+#define SQLGetData SQLGetData_replace
 #endif
 
 
@@ -7976,7 +8009,19 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
 							stmt_res->column_info[col_num].scale + 2 + 1;
 			}
 			else{
+#ifndef __PASE__
 				in_length = stmt_res->column_info[col_num].size+1;
+#else
+				// Assume the worst-case of 1 byte in the source
+				// encoding maps to 4-bytes encoded in UTF-8.
+				//
+				// NOTE: We could do some heuristics to limit the amount
+				// of memory we allocate, but the maximum record length
+				// is 32KiB, so the max we could allocate for all
+				// columns would not exceed 128KiB, which is tiny and
+				// not worth bothering with.
+				in_length = stmt_res->column_info[col_num].size*4 + 1;
+#endif
 			}
 			out_ptr = (SQLPOINTER)ALLOC_N(SQLTCHAR, in_length);
 
@@ -8002,6 +8047,9 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
 			} else if (column_type == SQL_BIGINT){
 				return_value = PyLong_FromString(out_ptr, NULL, 0);
 			} else {
+				if (out_length > in_length * sizeof(SQLTCHAR)) {
+					out_length = (in_length-1) * sizeof(SQLTCHAR);
+				}
 				return_value = getSQLTCharAsPyUnicodeObject(out_ptr, out_length);
 			}
 			PyMem_Del(out_ptr);
@@ -8215,14 +8263,6 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
 				void *tmp_out_ptr = NULL;
 
 				tmp_out_ptr = ALLOC_N(char, out_length + len_terChar);
-#ifdef PASE
-                // PASE CLI has a bug that causes it not to NULL-terminate
-                // the output when SQLGetData truncates. Only do this for character types
-                // (those that have a len_terChar > 0)
-                if (len_terChar && ((char*)out_ptr)[bytes] != 0) {
-                    bytes++;
-                }
-#endif
 				memcpy(tmp_out_ptr, out_ptr, bytes);
 				PyMem_Del(out_ptr);
 				out_ptr = tmp_out_ptr;
@@ -8549,14 +8589,6 @@ static PyObject *_python_ibm_db_bind_fetch_helper(PyObject *args, int op)
 						void *tmp_out_ptr = NULL;
 
 						tmp_out_ptr = (void *)ALLOC_N(char, out_length + INIT_BUFSIZ + len_terChar);
-#ifdef PASE
-                        // PASE CLI has a bug that causes it not to NULL-terminate
-                        // the output when SQLGetData truncates. Only do this for character types
-                        // (those that have a len_terChar > 0)
-                        if (len_terChar && ((char*)out_ptr)[bytes] != 0) {
-                            bytes++;
-                        }
-#endif
 						memcpy(tmp_out_ptr, out_ptr, bytes);
 						PyMem_Del(out_ptr);
 						out_ptr = tmp_out_ptr;

@@ -653,8 +653,8 @@ def _connect_helper(conn_func, dsn, user, password, host, database, conn_options
             conn = conn_func(dsn, '', '', options)
         else:
             conn = conn_func(database, user, password, options)
-        
-        ibm_db.set_option(conn, {SQL_ATTR_CURRENT_SCHEMA : user}, 1)
+            if conn:
+                ibm_db.set_option(conn, {SQL_ATTR_CURRENT_SCHEMA : user}, 1)
     except Exception as inst:
         raise _get_exception(inst)
 

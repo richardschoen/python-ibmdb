@@ -1523,6 +1523,9 @@ static PyObject *_python_ibm_db_connect_helper( PyObject *self, PyObject *args, 
 				int val;
 				int key = set_joblog_message_marker();
 
+                val = SQL_TRUE;
+                SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_ENVHNDL_COUNTER, &val, 0);
+
 				val = SQL_TRUE;
 				SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_SERVER_MODE, &val, 0);
 				

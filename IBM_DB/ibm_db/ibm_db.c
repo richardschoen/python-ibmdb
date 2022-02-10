@@ -34,6 +34,12 @@
 #include <dlfcn.h>
 #endif
 
+#ifdef __PASE__
+#include <os400msg.h>
+static int set_joblog_message_marker();
+static void clear_joblog_messages(int key);
+#endif
+
 /* True global resources - no need for thread safety here */
 static struct _ibm_db_globals *ibm_db_globals;
 
@@ -1515,7 +1521,8 @@ static PyObject *_python_ibm_db_connect_helper( PyObject *self, PyObject *args, 
 #else
 			{
 				int val;
-				
+				int key = set_joblog_message_marker();
+
 				val = SQL_TRUE;
 				SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_SERVER_MODE, &val, 0);
 				
@@ -1524,6 +1531,8 @@ static PyObject *_python_ibm_db_connect_helper( PyObject *self, PyObject *args, 
 				
 				val = SQL_TRUE;
 				SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_NON_HEXCCSID, &val, 0);
+
+				clear_joblog_messages(key);
 			}
 #endif
 		}
@@ -11297,4 +11306,111 @@ static SQLTCHAR* getUnicodeDataAsSQLTCHAR(PyObject* obj, int* isNewBuffer)
   
   return buf;
 }
+#endif
+
+#ifdef __PASE__
+
+static int set_joblog_message_marker() {
+    // "PYTHON IBMDB MARKER"
+    const char* msg = "\xd7\xe8\xe3\xc8\xd6\xd5\x40\xc9\xc2\xd4\xc4\xc2\x40\xd4\xc1\xd9\xd2\xc5\xd9";
+
+    struct {
+        int bytes_provided;
+        int bytes_available;
+        char msgid[7];
+        char reserved;
+    } err = { sizeof(err) };
+
+    int key;
+
+    int rc = QMHSNDPM(
+        "",           // msgid
+        "",           // msgf
+        msg,          // msgdata
+        strlen(msg),  // msgdatalen
+        "*DIAG",      // msgtype
+        "*",          // pgmq
+        0,            // pgmqdelta
+        &key,         // msgkey
+        &err          // errcode
+    );
+
+    if (rc == -1) {
+        return 0x40404040;
+    }
+
+    return key;
+}
+
+static void clear_joblog_messages(int key) {
+#pragma pack(1)
+    struct {
+        int returned;
+        int available;
+        int severity;
+        char msgid[7];
+        char type[2];
+        int key;
+    } msginfo;
+#pragma pack()
+
+    struct {
+        int bytes_provided;
+        int bytes_available;
+        char msgid[7];
+        char reserved;
+    } err = { sizeof(err) };
+
+    int outkey;
+    int rc;
+
+    // Ignore invalid message key
+    if (key) return;
+
+    while (1) {
+        outkey = 0x40404040;
+        rc = QMHRCVPM(
+            &msginfo,        // msginfo
+            sizeof(msginfo), // msginfolen
+            "RCVM0100",      // format
+            "*",             // pgmq
+            0,               // pgmqdelta
+            "*LAST",         // msgtype
+            &outkey,         // msgkey
+            0,               // wait time
+            "*SAME",         // action
+            &err
+        );
+
+        if (rc != 0) break;
+
+        outkey = msginfo.key;
+
+        rc = QMHRCVPM(
+            &msginfo,        // msginfo
+            sizeof(msginfo), // msginfolen
+            "RCVM0100",      // format
+            "*",             // pgmq
+            0,               // pgmqdelta
+            "*ANY",          // msgtype
+            &outkey,         // msgkey
+            0,               // wait time
+            "*REMOVE",       // action
+            &err
+        );
+
+        if (rc != 0) break;
+        if (outkey == key) break;
+    }
+
+#if 0
+    if (rc != 0) {
+        printf("rc = %d key = %x, outkey = %x\n", rc, key, outkey);
+        printf("msgid = %02x %02x %02x %02x %02x %02x %02x\n",
+                err.msgid[0],  err.msgid[1],  err.msgid[2],
+                err.msgid[3],  err.msgid[4],  err.msgid[5],  err.msgid[6]);
+    }
+#endif
+}
+
 #endif

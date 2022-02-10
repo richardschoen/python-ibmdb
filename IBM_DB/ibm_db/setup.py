@@ -19,7 +19,7 @@ from distutils.core import setup, Extension
 from distutils.sysconfig import get_python_lib
 
 PACKAGE = 'ibm_db'
-VERSION = '2.0.5.12'
+VERSION = '2.0.5.13'
 LICENSE = 'Apache License 2.0'
 
 machine_bits =  8 * struct.calcsize("P")

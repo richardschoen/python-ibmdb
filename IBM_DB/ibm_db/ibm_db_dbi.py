@@ -653,8 +653,8 @@ def _connect_helper(conn_func, dsn, user, password, host, database, conn_options
             conn = conn_func(dsn, '', '', options)
         else:
             conn = conn_func(database, user, password, options)
-            if conn:
-                ibm_db.set_option(conn, {SQL_ATTR_CURRENT_SCHEMA : user}, 1)
+        if conn and user:
+            ibm_db.set_option(conn, {SQL_ATTR_CURRENT_SCHEMA : user}, 1)
     except Exception as inst:
         raise _get_exception(inst)
 
@@ -799,14 +799,7 @@ class Connection(object):
         """
         self.current_schema = schema_name
         try:
-          if not _is_ibmi():
-              is_set = ibm_db.set_option(self.conn_handler, {SQL_ATTR_CURRENT_SCHEMA : schema_name}, 1)
-          else:
-              stmt = ibm_db.prepare(self.conn_handler, "set current schema = ?")
-              if(stmt):
-                  is_set = ibm_db.execute(stmt, (schema_name, ))
-              else:
-                  is_set = False     
+          is_set = ibm_db.set_option(self.conn_handler, {SQL_ATTR_CURRENT_SCHEMA : schema_name}, 1)
         except Exception as inst:
           raise _get_exception(inst)
         return is_set
@@ -816,14 +809,9 @@ class Connection(object):
         """Return: current setting of the schema attribute
         """
         try:
-          if not _is_ibmi():
-              conn_schema = ibm_db.get_option(self.conn_handler, SQL_ATTR_CURRENT_SCHEMA, 1)
-              if conn_schema is not None and conn_schema != '':
-                self.current_schema = conn_schema
-          else:
-              stmt = ibm_db.exec_immediate(self.conn_handler, "select current_schema from sysibm.sysdummy1")
-              result = ibm_db.fetch_both(stmt)
-              self.current_schema = result[0]
+          conn_schema = ibm_db.get_option(self.conn_handler, SQL_ATTR_CURRENT_SCHEMA, 1)
+          if conn_schema is not None and conn_schema != '':
+              self.current_schema = conn_schema
         except Exception as inst:
           raise _get_exception(inst)
         return self.current_schema

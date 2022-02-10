@@ -142,9 +142,10 @@ const int _check_i = 1;
 #define SQL_ATTR_INFO_PROGRAMNAME SQL_ATTR_INFO_PROGRAMID
 #endif
 
+#define SQL_ATTR_CURRENT_SCHEMA SQL_ATTR_DBC_DEFAULT_LIB
+
 // TODO: Remove these definitions
 #define SQL_INDEX_CLUSTERED 6
-#define SQL_ATTR_CURRENT_SCHEMA 7
 #endif
 
 /* Defines a linked list structure for error messages */

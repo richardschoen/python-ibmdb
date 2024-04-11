@@ -11339,7 +11339,9 @@ static int set_joblog_message_marker() {
     );
 
     if (rc == -1) {
-        return 0x40404040;
+        // When receiving 0 is a special value for *NEXT/*PREV, which we don't
+        // use and it's also a nice boolean false value
+        return 0;
     }
 
     return key;
@@ -11368,10 +11370,18 @@ static void clear_joblog_messages(int key) {
     int rc;
 
     // Ignore invalid message key
-    if (key) return;
+    if (!key) return;
 
+    // Retrieve all the messages from the most recent up to and including the
+    // marker message
     while (1) {
-        outkey = 0x40404040;
+        // "If you are not receiving messages by key, use blanks for this
+        // parameter."
+        outkey = 0x40404040; // '    ' in EBCDIC
+
+        // Receive the most recent message on the queue. We can't remove it
+        // yet, since removing a message doesn't return the message key and we
+        // need that to know when we find our marker message.
         rc = QMHRCVPM(
             &msginfo,        // msginfo
             sizeof(msginfo), // msginfolen
@@ -11384,11 +11394,10 @@ static void clear_joblog_messages(int key) {
             "*SAME",         // action
             &err
         );
-
         if (rc != 0) break;
 
+        // Now that we have the message key, remove the message
         outkey = msginfo.key;
-
         rc = QMHRCVPM(
             &msginfo,        // msginfo
             sizeof(msginfo), // msginfolen
@@ -11401,8 +11410,9 @@ static void clear_joblog_messages(int key) {
             "*REMOVE",       // action
             &err
         );
-
         if (rc != 0) break;
+
+        // When we've found our marker message, we're done
         if (outkey == key) break;
     }
 
